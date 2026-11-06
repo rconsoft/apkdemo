@@ -1,0 +1,15 @@
+name: rconsoft_crm
+description: RCONSOFT CRM employee Android app with demo mode and Laravel API
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  url_launcher: ^6.3.2
+
+flutter:
+  uses-material-design: true
