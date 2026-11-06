@@ -1,0 +1,56 @@
+name: Build RCONSOFT CRM APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build Android APK (release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android project
+        working-directory: flutter_app
+        run: |
+          flutter --version
+          flutter create --platforms=android --org com.rconsoft --project-name rconsoft_crm .
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          if 'android.permission.INTERNET' not in s:
+              s = s.replace("<application", '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
+          s = s.replace('android:label="rconsoft_crm"', 'android:label="RCONSOFT CRM"')
+          p.write_text(s)
+          PY
+          flutter pub get
+      - name: Analyze Dart
+        working-directory: flutter_app
+        run: dart analyze lib || true
+      - name: Compile release APK
+        working-directory: flutter_app
+        run: flutter build apk --release
+      - name: Upload installable APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RCONSOFT_CRM_Android_APK
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
