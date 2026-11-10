@@ -25,14 +25,14 @@ jobs:
       - name: Prepare Flutter Android
         working-directory: flutter_app
         run: |
-          flutter create --platforms=android --org com.rconsoft --project-name rconsoft_hrms_crm .
+          flutter create --platforms=android --org com.rconsoft --project-name rconsoft_hrms_mobile .
           python3 - <<'PY'
           from pathlib import Path
           p=Path('android/app/src/main/AndroidManifest.xml')
           s=p.read_text()
           if 'android.permission.INTERNET' not in s:
             s=s.replace('<application','<uses-permission android:name="android.permission.INTERNET" />\n    <application',1)
-          s=s.replace('android:label="rconsoft_hrms_crm"','android:label="RCONSOFT HRMS CRM"')
+          s=s.replace('android:label="rconsoft_hrms_mobile"','android:label="RCONSOFT HRMS CRM V2"')
           p.write_text(s)
           PY
           flutter pub get
@@ -42,7 +42,7 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: RCONSOFT_HRMS_CRM_APK
+          name: RCONSOFT_HRMS_ROLE_LOGIN_V2_APK
           path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 30
