@@ -43,6 +43,17 @@ class CrmApp extends StatefulWidget {
 
 class _CrmAppState extends State<CrmApp> {
   final api = Api();
+  final navigatorKey = GlobalKey<NavigatorState>();
+  String role = '';
+  Map<String,dynamic> user = {};
+  Map<String,dynamic> stats = {};
+  List<Map<String,dynamic>> tenantList = [];
+  List<Map<String,dynamic>> pendingRequests = [];
+  List<Map<String,dynamic>> attendanceList = [];
+  List<Map<String,dynamic>> leaveList = [];
+  bool get isSuper => role == 'super_admin';
+  bool get isManager => ['company_admin','admin','manager','hr'].contains(role);
+
   bool signedIn = false;
   bool demo = true;
   bool loading = false;
@@ -59,7 +70,7 @@ class _CrmAppState extends State<CrmApp> {
   ];
   List<Map<String, dynamic>> activities = [];
 
-  void notice(String msg) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); }
+  void notice(String msg) { if (mounted) ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(SnackBar(content: Text(msg))); }
   Future<void> sync() async {
     if (demo) { setState(() => leads = sample.map((e) => Map<String, dynamic>.from(e)).toList()); return; }
     setState(() => loading = true);
@@ -89,33 +100,31 @@ class _CrmAppState extends State<CrmApp> {
   }
 
   Future<void> loginDialog() async {
-    final server = TextEditingController(text: api.base);
     final email = TextEditingController();
     final pass = TextEditingController();
-    await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+    await showDialog<void>(context: navigatorKey.currentContext!, builder: (ctx) => AlertDialog(
       backgroundColor: panel,
-      title: const Text('Connect to your CRM'),
+      title: const Text('Enter Login ID & Password'),
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        field(server, 'API Base URL', icon: Icons.link),
-        const SizedBox(height: 10),
-        field(email, 'Employee email', icon: Icons.email),
+        field(email, 'Email ID', icon: Icons.person_outline),
         const SizedBox(height: 10),
         TextField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock))),
         const SizedBox(height: 10),
-        const Text('Your Laravel server must have /api/mobile/v1/login configured. Credentials are sent via HTTPS.', style: TextStyle(fontSize: 12, color: Colors.white60)),
+        const Text('Your account role and company will be detected automatically.', style: TextStyle(fontSize: 12, color: Colors.white60)),
       ])),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
         FilledButton(onPressed: () async {
-          final url = server.text.trim().replaceAll(RegExp(r'/+$'), '');
-          if (!url.startsWith('https://')) { notice('Use HTTPS API URL'); return; }
-          api.base = url;
+          if (email.text.trim().isEmpty || pass.text.isEmpty) { notice('Enter Email ID and Password'); return; }
           try {
             final answer = await api.request('/login', method: 'POST', data: {'email': email.text.trim(), 'password': pass.text});
             api.token = answer['token'].toString();
             if (api.token.isEmpty) throw Exception('No token returned');
+            user = Map<String,dynamic>.from(answer['user'] as Map);
+            role = (user['role'] ?? 'employee').toString();
+            if(!['super_admin','company_admin','admin','manager','hr','employee'].contains(role)) throw Exception('Unsupported role');
             demo = false;
-            username = (answer['user']?['name'] ?? 'Employee').toString();
+            username = (user['name'] ?? 'Employee').toString();
             if (ctx.mounted) Navigator.pop(ctx);
             setState(() { signedIn = true; tab = 0; });
             await sync();
@@ -123,7 +132,7 @@ class _CrmAppState extends State<CrmApp> {
         }, child: const Text('Sign in'))
       ],
     ));
-    server.dispose(); email.dispose(); pass.dispose();
+    email.dispose(); pass.dispose();
   }
 
   Widget field(TextEditingController controller, String label, {IconData? icon}) => TextField(
@@ -140,7 +149,7 @@ class _CrmAppState extends State<CrmApp> {
     final domain = TextEditingController(text: current?['domain']?.toString() ?? '');
     final industry = TextEditingController(text: current?['industry']?.toString() ?? '');
     String status = current?['status']?.toString() ?? 'new';
-    await showDialog<void>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, change) => AlertDialog(
+    await showDialog<void>(context: navigatorKey.currentContext!, builder: (ctx) => StatefulBuilder(builder: (ctx, change) => AlertDialog(
       backgroundColor: panel,
       title: Text(current == null ? 'Add new lead' : 'Edit lead'),
       content: SizedBox(width: 420, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -189,7 +198,7 @@ class _CrmAppState extends State<CrmApp> {
   Future<void> activityDialog(Map<String, dynamic> lead) async {
     final note = TextEditingController();
     String channel = 'call';
-    await showDialog<void>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, change) => AlertDialog(
+    await showDialog<void>(context: navigatorKey.currentContext!, builder: (ctx) => StatefulBuilder(builder: (ctx, change) => AlertDialog(
       backgroundColor: panel,
       title: Text('Activity • ${lead['name']}'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -217,7 +226,7 @@ class _CrmAppState extends State<CrmApp> {
   }
 
   Future<void> deleteLead(Map<String, dynamic> lead) async {
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+    final ok = await showDialog<bool>(context: navigatorKey.currentContext!, builder: (ctx) => AlertDialog(
       title: const Text('Delete lead?'), content: Text('Remove ${lead['name']}? This cannot be undone.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
         TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: crimson)))],
@@ -239,6 +248,7 @@ class _CrmAppState extends State<CrmApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    navigatorKey: navigatorKey,
     title: 'RCONSOFT HRMS CRM', debugShowCheckedModeBanner: false,
     theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: charcoal, colorScheme: const ColorScheme.dark(primary: crimson, surface: panel), useMaterial3: true, cardTheme: const CardThemeData(color: panel, margin: EdgeInsets.symmetric(vertical: 6))),
     home: signedIn ? home() : welcome(),
@@ -255,7 +265,7 @@ class _CrmAppState extends State<CrmApp> {
       const SizedBox(height: 12),
       const SizedBox.shrink(),
       const SizedBox(height: 22),
-      const Text('Demo records stay on your device session only. Live CRM login needs an API endpoint on your existing cPanel Laravel website.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.white54)),
+      const Text('Login with your HRMS Email ID and Password. Your assigned workspace opens automatically.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.white54)),
     ],
   ))));
 
@@ -348,7 +358,7 @@ class _CrmAppState extends State<CrmApp> {
       try{
         final r=await api.request('/attendance');final list=r is Map?r['data']:r;
         if(!mounted)return;
-        showModalBottomSheet(context:context,builder:(ctx)=>ListView(children:[
+        showModalBottomSheet(context:navigatorKey.currentContext!,builder:(ctx)=>ListView(children:[
           const ListTile(title:Text('Attendance history')),
           ...(list is List?list:[]).take(20).map((v)=>ListTile(
             title:Text((v['work_date']??'').toString()),
