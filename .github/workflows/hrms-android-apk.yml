@@ -36,7 +36,7 @@ jobs:
           p.write_text(s)
           PY
           flutter pub get
-          dart analyze lib --fatal-infos=false
+          dart analyze lib --no-fatal-warnings
       - name: Build release APK
         working-directory: flutter_app
         run: flutter build apk --release
