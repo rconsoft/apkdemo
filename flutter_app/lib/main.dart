@@ -71,33 +71,47 @@ class _CrmAppState extends State<CrmApp> {
   List<Map<String, dynamic>> activities = [];
 
   void notice(String msg) { if (mounted) ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(SnackBar(content: Text(msg))); }
-  Future<void> sync() async {
-    if (demo) { setState(() => leads = sample.map((e) => Map<String, dynamic>.from(e)).toList()); return; }
-    setState(() => loading = true);
-    try {
-      final json = await api.request('/leads');
-      final rows = json is Map ? json['data'] : json;
-      if (rows is! List) throw Exception('Unexpected leads response');
-      final normalized=rows.map((e) {
-        final x=Map<String,dynamic>.from(e as Map);
-        x['company']=x['company_name']??'';
-        final st=(x['stage']??'New').toString();
-        x['status']=st=='Won'?'converted':st.toLowerCase();
-        x['next_follow_up_at']=x['next_follow_up']??'';
-        return x;
-      }).toList();
-      final taskResponse=await api.request('/tasks');
-      final taskList=taskResponse is Map?taskResponse['data']:taskResponse;
-      final peopleResponse=await api.request('/employees');
-      final peopleList=peopleResponse is Map?peopleResponse['data']:peopleResponse;
-      setState((){
-        leads=normalized;
-        hrmsTasks=taskList is List?taskList.map((e)=>Map<String,dynamic>.from(e as Map)).toList():[];
-        employees=peopleList is List?peopleList.map((e)=>Map<String,dynamic>.from(e as Map)).toList():[];
-      });
-    } catch (e) { notice('Could not load leads: $e'); }
-    finally { if (mounted) setState(() => loading = false); }
+
+  List<Map<String,dynamic>> asRows(dynamic input) {
+    final d = input is Map ? input['data'] : input;
+    return d is List ? d.map((x)=>Map<String,dynamic>.from(x as Map)).toList() : [];
   }
+
+  Future<void> sync() async {
+    if (demo || !signedIn) return;
+    setState(()=>loading=true);
+    try {
+      final data=await api.request(isSuper?'/super-admin/dashboard':'/dashboard');
+      final summary=data is Map?data['summary']:null;
+      stats=Map<String,dynamic>.from(summary is Map?summary:{});
+      if(isSuper){
+        final companies=await api.request('/super-admin/tenants');
+        final requests=await api.request('/super-admin/subscriptions');
+        if(mounted)setState(() {tenantList=asRows(companies);pendingRequests=asRows(requests);});
+      } else {
+        final tasks=await api.request('/tasks');
+        final attendance=await api.request('/attendance');
+        final leaves=await api.request('/leaves');
+        List<Map<String,dynamic>> newLeads=[];
+        List<Map<String,dynamic>> people=[];
+        if(isManager){
+          newLeads=asRows(await api.request('/leads')).map((x){
+            x['company']=x['company_name']??'';
+            final st=(x['stage']??'New').toString();
+            x['status']=st=='Won'?'converted':st.toLowerCase();
+            return x;
+          }).toList();
+          people=asRows(await api.request('/employees'));
+        }
+        if(mounted)setState((){
+          hrmsTasks=asRows(tasks);attendanceList=asRows(attendance);
+          leaveList=asRows(leaves);leads=newLeads;employees=people;
+        });
+      }
+    }catch(e){notice('Sync error: $e');}
+    finally{if(mounted)setState(()=>loading=false);}
+  }
+
 
   Future<void> loginDialog() async {
     final email = TextEditingController();
@@ -269,22 +283,38 @@ class _CrmAppState extends State<CrmApp> {
     ],
   ))));
 
-  Widget home() => Scaffold(
-    appBar: AppBar(backgroundColor: charcoal, title: Row(children: [
-      const Icon(Icons.hub, color: crimson), const SizedBox(width: 10),
-      const Text('RCONSOFT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
-      if (demo) const Padding(padding: EdgeInsets.only(left: 8), child: Text('DEMO', style: TextStyle(color: crimson, fontSize: 10))),
-    ]), actions: [IconButton(onPressed: sync, icon: const Icon(Icons.refresh))]),
-    body: loading ? const Center(child: CircularProgressIndicator()) : SafeArea(child: IndexedStack(index: tab, children: [dashboard(), leadsPage(), followupPage(), activityPage(), profilePage()])),
-    floatingActionButton: tab == 1 ? FloatingActionButton(backgroundColor: crimson, foregroundColor: Colors.white, onPressed: () => saveLead(null), child: const Icon(Icons.add)) : null,
-    bottomNavigationBar: NavigationBar(selectedIndex: tab, backgroundColor: panel, indicatorColor: crimson.withValues(alpha: 0.20), onDestinationSelected: (v) => setState(() => tab = v), destinations: const [
-      NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
-      NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Leads'),
-      NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today), label: 'Tasks'),
-      NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'Team'),
-      NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
-    ]),
-  );
+
+  Widget home(){
+    final labels=isSuper?['Home','Tenants','Approvals','Profile']
+      :isManager?['Home','Leads','Tasks','Team','Profile']
+      :['Home','Attendance','Tasks','Leaves','Profile'];
+    final icons=isSuper?[Icons.dashboard,Icons.apartment,Icons.verified_user,Icons.person]
+      :isManager?[Icons.dashboard,Icons.people,Icons.checklist,Icons.badge,Icons.person]
+      :[Icons.dashboard,Icons.schedule,Icons.checklist,Icons.event_note,Icons.person];
+    final pages=isSuper?[dashboard(),tenantsPage(),approvalsPage(),profilePage()]
+      :isManager?[dashboard(),leadsPage(),followupPage(),activityPage(),profilePage()]
+      :[dashboard(),attendancePage(),followupPage(),leavesPage(),profilePage()];
+    return Scaffold(
+      appBar:AppBar(backgroundColor:charcoal,
+        title:Row(children:[const Icon(Icons.hub,color:crimson),const SizedBox(width:10),
+          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const Text('RCONSOFT',style:TextStyle(fontWeight:FontWeight.w900,letterSpacing:1)),
+            Text(isSuper?'Super Admin':(user['company_name']??'HRMS CRM').toString(),
+              maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,color:Colors.white60)),
+          ]))]),
+        actions:[IconButton(onPressed:sync,icon:const Icon(Icons.refresh))]),
+      body:loading?const Center(child:CircularProgressIndicator()):
+        SafeArea(child:pages[tab]),
+      floatingActionButton:isManager&&tab==1?FloatingActionButton(
+        backgroundColor:crimson,foregroundColor:Colors.white,
+        onPressed:()=>saveLead(null),child:const Icon(Icons.add)):null,
+      bottomNavigationBar:NavigationBar(selectedIndex:tab,backgroundColor:panel,
+        indicatorColor:crimson.withValues(alpha:0.2),
+        onDestinationSelected:(v)=>setState(()=>tab=v),
+        destinations:List.generate(labels.length,(i)=>NavigationDestination(icon:Icon(icons[i]),label:labels[i]))),
+    );
+  }
+
 
   Widget section(String title, {Widget? extra}) => Row(children: [Expanded(child: Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold))), if (extra != null) extra]);
   Widget metric(String text, int value, IconData icon, Color color) => Container(
@@ -295,33 +325,32 @@ class _CrmAppState extends State<CrmApp> {
     ]),
   );
 
-  Widget dashboard() {
-    int count(String s) => leads.where((e) => e['status'] == s).length;
-    return ListView(padding: const EdgeInsets.all(18), children: [
-      Text('Welcome back,', style: TextStyle(color: Colors.grey.shade400)),
-      Text(username, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 6),
-      const Text('Here is your sales overview', style: TextStyle(color: Colors.white54)),
-      const SizedBox(height: 22),
-      GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.35, children: [
-        metric('Total Leads', leads.length, Icons.group, crimson),
-        metric('New Leads', count('new'), Icons.new_releases, Colors.orange),
-        metric('Contacted', count('contacted'), Icons.phone_in_talk, Colors.blueAccent),
-        metric('Converted', count('converted'), Icons.check_circle, Colors.greenAccent),
-      ]),
-      const SizedBox(height: 23),
-      section('Quick actions'),
-      const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: OutlinedButton.icon(onPressed: () => saveLead(null), icon: const Icon(Icons.person_add), label: const Text('Add lead'))),
-        const SizedBox(width: 10),
-        Expanded(child: OutlinedButton.icon(onPressed: () => setState(() => tab = 2), icon: const Icon(Icons.assignment), label: const Text('Follow-ups'))),
-      ]),
-      const SizedBox(height: 24),
-      section('Recent leads', extra: TextButton(onPressed: () => setState(() => tab = 1), child: const Text('View all'))),
-      ...leads.take(5).map(leadCard),
-    ]);
-  }
+
+  Widget dashboard() => ListView(padding:const EdgeInsets.all(18),children:[
+    Text('Welcome, $username',style:const TextStyle(fontSize:24,fontWeight:FontWeight.bold)),
+    const SizedBox(height:4),
+    Text(isSuper?'Platform overview':isManager?'Company dashboard':'Employee dashboard',
+      style:const TextStyle(color:Colors.white60)),
+    const SizedBox(height:22),
+    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),
+      itemCount:stats.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount:2,mainAxisSpacing:10,crossAxisSpacing:10,childAspectRatio:1.35),
+      itemBuilder:(context,i){
+        final item=stats.entries.elementAt(i);
+        return metric(item.key.replaceAll('_',' ').toUpperCase(),
+          int.tryParse(item.value.toString())??0,
+          Icons.analytics_outlined,i.isEven?crimson:Colors.blueAccent);
+      }),
+    const SizedBox(height:20),
+    Card(child:ListTile(leading:const Icon(Icons.shield_outlined,color:crimson),
+      title:Text((user['company_name']??'RCONSOFT Platform').toString()),
+      subtitle:Text('Role: $role'))),
+    Card(child:ListTile(leading:const Icon(Icons.sync,color:crimson),
+      title:const Text('Connected with Laravel / MySQL'),
+      subtitle:const Text('Refresh to see latest website records'),
+      trailing:IconButton(onPressed:sync,icon:const Icon(Icons.refresh)))),
+  ]);
+
 
   Widget leadsPage() {
     return LeadsView(leads: leads, onEdit: saveLead, onActivity: activityDialog, onDelete: deleteLead, onCall: dial);
@@ -336,9 +365,11 @@ class _CrmAppState extends State<CrmApp> {
       subtitle:Text('${task['assigned_to']??'Unassigned'} • ${task['status']??'Open'}'),
       trailing:IconButton(icon:const Icon(Icons.done_all),tooltip:'Complete task',onPressed:()async{
         try{
-          await api.request('/tasks/${task['id']}',method:'PATCH',data:{
+          await api.request(isManager?'/tasks/${task['id']}':'/tasks/${task['id']}/my-status',
+            method:'PATCH',data:isManager?{
             'title':task['title'],'priority':task['priority']??'Medium','status':'Completed',
-            'description':task['description'],'assigned_to':task['assigned_to']});
+            'description':task['description'],'assigned_to':task['assigned_to']}
+            :{'status':'Completed'});
           await sync();notice('Task updated');
         }catch(e){notice('Task error: $e');}
       }),
@@ -368,19 +399,121 @@ class _CrmAppState extends State<CrmApp> {
     },icon:const Icon(Icons.schedule),label:const Text('Attendance history')),
   ]);
 
+
+  Widget tenantsPage()=>ListView(padding:const EdgeInsets.all(18),children:[
+    section('Company Workspaces'),const SizedBox(height:12),
+    if(tenantList.isEmpty)const Card(child:ListTile(title:Text('No tenant records'))),
+    ...tenantList.map((t)=>Card(child:ListTile(
+      leading:const Icon(Icons.apartment,color:crimson),
+      title:Text((t['name']??'Company').toString()),
+      subtitle:Text('Slug: ${t['slug']??''}\nDatabase: ${t['database_ready_at']==null?'Pending':'Ready'}'),
+      isThreeLine:true))),
+  ]);
+
+  Future<void> reviewRequest(Map<String,dynamic> r,String decision)async{
+    try{
+      await api.request('/super-admin/subscriptions/${r['id']}/review',
+        method:'POST',data:{'decision':decision});
+      notice('Subscription $decision');await sync();
+    }catch(e){notice('Review error: $e');}
+  }
+
+  Widget approvalsPage()=>ListView(padding:const EdgeInsets.all(18),children:[
+    section('Subscription Approvals'),const SizedBox(height:12),
+    if(pendingRequests.isEmpty)const Card(child:ListTile(title:Text('No pending requests'))),
+    ...pendingRequests.map((r)=>Card(child:Column(children:[
+      ListTile(leading:const Icon(Icons.verified_user,color:crimson),
+        title:Text((r['company']?['name']??'Company').toString()),
+        subtitle:Text('${r['plan_months']??''} months • ${r['status']??''}')),
+      Row(mainAxisAlignment:MainAxisAlignment.end,children:[
+        TextButton(onPressed:()=>reviewRequest(r,'rejected'),child:const Text('Reject')),
+        FilledButton(onPressed:()=>reviewRequest(r,'approved'),child:const Text('Approve')),
+        const SizedBox(width:12)]),
+    ]))),
+  ]);
+
+  Future<void> punch(String type)async{
+    try{
+      await api.request('/attendance/$type',method:'POST',data:{});
+      notice(type=='check-in'?'Check-in recorded':'Check-out recorded');
+      await sync();
+    }catch(e){notice('Attendance error: $e');}
+  }
+
+  Widget attendancePage()=>ListView(padding:const EdgeInsets.all(18),children:[
+    section('My Attendance'),const SizedBox(height:12),
+    Row(children:[
+      Expanded(child:FilledButton.icon(onPressed:()=>punch('check-in'),
+        icon:const Icon(Icons.login),label:const Text('Check In'))),
+      const SizedBox(width:8),
+      Expanded(child:OutlinedButton.icon(onPressed:()=>punch('check-out'),
+        icon:const Icon(Icons.logout),label:const Text('Check Out'))),
+    ]),
+    const SizedBox(height:15),
+    if(attendanceList.isEmpty)const Card(child:ListTile(title:Text('No attendance yet'))),
+    ...attendanceList.map((a)=>Card(child:ListTile(
+      leading:const Icon(Icons.today,color:crimson),
+      title:Text((a['work_date']??'').toString()),
+      subtitle:Text('Status: ${a['status']??''} • In: ${a['check_in']??'—'}\nOut: ${a['check_out']??'—'}')))),
+  ]);
+
+  Widget leavesPage()=>ListView(padding:const EdgeInsets.all(18),children:[
+    section('My Leaves'),const SizedBox(height:12),
+    FilledButton.icon(onPressed:applyLeave,icon:const Icon(Icons.add),label:const Text('Apply for Leave')),
+    const SizedBox(height:12),
+    if(leaveList.isEmpty)const Card(child:ListTile(title:Text('No leave requests'))),
+    ...leaveList.map((r)=>Card(child:ListTile(
+      leading:const Icon(Icons.event_note,color:crimson),
+      title:Text((r['leave_type']??'Leave').toString()),
+      subtitle:Text('${r['start_date']} — ${r['end_date']}'),
+      trailing:Text((r['status']??'').toString())))),
+  ]);
+
+  Future<void> applyLeave()async{
+    final start=TextEditingController(),end=TextEditingController(),reason=TextEditingController();
+    String type='Casual';
+    await showDialog<void>(context:navigatorKey.currentContext!,builder:(ctx)=>StatefulBuilder(
+      builder:(ctx,update)=>AlertDialog(
+        title:const Text('Apply for Leave'),
+        content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+          DropdownButtonFormField<String>(value:type,
+            items:['Casual','Annual','Sick','Unpaid','Other']
+              .map((s)=>DropdownMenuItem(value:s,child:Text(s))).toList(),
+            onChanged:(v)=>update(()=>type=v??'Casual')),
+          field(start,'Start YYYY-MM-DD'),field(end,'End YYYY-MM-DD'),field(reason,'Reason'),
+        ])),
+        actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
+          FilledButton(onPressed:()async{
+            try{
+              await api.request('/leaves',method:'POST',data:{
+                'leave_type':type,'start_date':start.text.trim(),
+                'end_date':end.text.trim(),'reason':reason.text.trim()});
+              if(ctx.mounted)Navigator.pop(ctx);
+              notice('Leave application submitted');await sync();
+            }catch(e){notice('Leave failed: $e');}
+          },child:const Text('Submit')),
+        ],
+      )));
+    start.dispose();end.dispose();reason.dispose();
+  }
+
   Widget profilePage() => ListView(padding: const EdgeInsets.all(18), children: [
     const SizedBox(height: 16),
     const Center(child: CircleAvatar(radius: 45, backgroundColor: crimson, child: Icon(Icons.person, size: 48, color: Colors.white))),
     const SizedBox(height: 15),
     Center(child: Text(username, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.bold))),
     Center(child: Text(demo ? 'Demo preview' : 'Connected employee', style: const TextStyle(color: Colors.white54))),
-    const SizedBox(height: 30),
+    const SizedBox(height: 12),
+    Card(child:ListTile(leading:const Icon(Icons.shield),title:const Text('Role'),subtitle:Text(role))),
+    Card(child:ListTile(leading:const Icon(Icons.business),title:const Text('Company'),
+      subtitle:Text((user['company_name']??'RCONSOFT').toString()))),
+    const SizedBox(height: 20),
     Card(child: ListTile(leading: const Icon(Icons.dns), title: const Text('API Server'), subtitle: Text(demo ? 'Demo mode / no live sync' : api.base))),
     Card(child: ListTile(leading: const Icon(Icons.info_outline), title: const Text('App version'), subtitle: const Text('1.0.0 • Android'))),
     const SizedBox(height: 20),
     FilledButton.icon(onPressed: () async {
       if (!demo) { try { await api.request('/logout', method: 'POST'); } catch (_) {} }
-      setState(() { signedIn = false; api.token = ''; leads = []; activities = []; tab = 0; demo = true; });
+      setState(() {signedIn=false;api.token='';role='';user={};stats={};leads=[];hrmsTasks=[];employees=[];tab=0;demo=false;});
     }, icon: const Icon(Icons.logout), label: const Text('Sign out')),
   ]);
 
