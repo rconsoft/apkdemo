@@ -1,0 +1,13 @@
+name: rconsoft_hrms_full
+description: RCONSOFT full HRMS and CRM Flutter hybrid Android app.
+publish_to: none
+version: 3.0.0+3
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.13.0
+  url_launcher: ^6.3.2
+flutter:
+  uses-material-design: true
