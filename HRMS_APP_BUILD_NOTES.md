@@ -1,0 +1,1 @@
+HRMS CRM Android test build, connected to Laravel API /api/mobile/v1. Backend full ZIP must be deployed separately before live login. No database credentials are embedded. This GitHub APK is the CRM-focused build; the complete HRMS Flutter source is provided as a separate ZIP.\n

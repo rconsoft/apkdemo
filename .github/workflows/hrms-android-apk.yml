@@ -1,0 +1,48 @@
+name: Build RCONSOFT HRMS CRM APK
+on:
+  push:
+    branches: [hrms-flutter-v1]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/hrms-android-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare Flutter Android
+        working-directory: flutter_app
+        run: |
+          flutter create --platforms=android --org com.rconsoft --project-name rconsoft_hrms_crm .
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
+          if 'android.permission.INTERNET' not in s:
+            s=s.replace('<application','<uses-permission android:name="android.permission.INTERNET" />\n    <application',1)
+          s=s.replace('android:label="rconsoft_hrms_crm"','android:label="RCONSOFT HRMS CRM"')
+          p.write_text(s)
+          PY
+          flutter pub get
+          dart analyze lib --fatal-infos=false
+      - name: Build release APK
+        working-directory: flutter_app
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCONSOFT_HRMS_CRM_APK
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30

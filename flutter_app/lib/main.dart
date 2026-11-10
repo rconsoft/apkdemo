@@ -8,10 +8,10 @@ void main() => runApp(const CrmApp());
 const crimson = Color(0xFFE53935);
 const charcoal = Color(0xFF0B0B0F);
 const panel = Color(0xFF19191F);
-const statuses = ['new', 'contacted', 'qualified', 'converted', 'lost'];
+const statuses = ['new','contacted','qualified','proposal','negotiation','converted','lost'];
 
 class Api {
-  String base = 'https://example.com/api/mobile/v1';
+  String base = 'https://myhrms.rconsoft.com/api/mobile/v1';
   String token = '';
   Future<dynamic> request(String route, {String method = 'GET', Map<String, dynamic>? data}) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
@@ -49,6 +49,8 @@ class _CrmAppState extends State<CrmApp> {
   int tab = 0;
   String username = 'Demo Employee';
   List<Map<String, dynamic>> leads = [];
+  List<Map<String, dynamic>> hrmsTasks=[];
+  List<Map<String, dynamic>> employees=[];
   final sample = [
     {'id': 1, 'name': 'Amit Sharma', 'company': 'Sharma Enterprises', 'phone': '9876543210', 'email': 'amit@example.com', 'location': 'Bhubaneswar', 'status': 'new', 'industry': 'Retail', 'domain': 'sharma.example', 'next_follow_up_at': '2026-11-07'},
     {'id': 2, 'name': 'Priya Das', 'company': 'Blue Ocean Travel', 'phone': '9000000000', 'email': '', 'location': 'Puri', 'status': 'contacted', 'industry': 'Travel', 'domain': '', 'next_follow_up_at': '2026-11-08'},
@@ -65,7 +67,23 @@ class _CrmAppState extends State<CrmApp> {
       final json = await api.request('/leads');
       final rows = json is Map ? json['data'] : json;
       if (rows is! List) throw Exception('Unexpected leads response');
-      setState(() => leads = rows.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      final normalized=rows.map((e) {
+        final x=Map<String,dynamic>.from(e as Map);
+        x['company']=x['company_name']??'';
+        final st=(x['stage']??'New').toString();
+        x['status']=st=='Won'?'converted':st.toLowerCase();
+        x['next_follow_up_at']=x['next_follow_up']??'';
+        return x;
+      }).toList();
+      final taskResponse=await api.request('/tasks');
+      final taskList=taskResponse is Map?taskResponse['data']:taskResponse;
+      final peopleResponse=await api.request('/employees');
+      final peopleList=peopleResponse is Map?peopleResponse['data']:peopleResponse;
+      setState((){
+        leads=normalized;
+        hrmsTasks=taskList is List?taskList.map((e)=>Map<String,dynamic>.from(e as Map)).toList():[];
+        employees=peopleList is List?peopleList.map((e)=>Map<String,dynamic>.from(e as Map)).toList():[];
+      });
     } catch (e) { notice('Could not load leads: $e'); }
     finally { if (mounted) setState(() => loading = false); }
   }
@@ -150,7 +168,13 @@ class _CrmAppState extends State<CrmApp> {
                 }
               });
             } else {
-              await api.request(current == null ? '/leads' : '/leads/${current['id']}', method: current == null ? 'POST' : 'PUT', data: data);
+              final stage=status=='converted'?'Won':status[0].toUpperCase()+status.substring(1);
+              await api.request(current==null?'/leads':'/leads/${current['id']}',method:current==null?'POST':'PATCH',data:{
+                'name':name.text.trim(),'company_name':company.text.trim(),
+                'phone':phone.text.trim().isEmpty?null:phone.text.trim(),
+                'email':email.text.trim().isEmpty?null:email.text.trim(),
+                'stage':stage,'value':0,
+              });
               await sync();
             }
             if (ctx.mounted) Navigator.pop(ctx);
@@ -177,7 +201,11 @@ class _CrmAppState extends State<CrmApp> {
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
         FilledButton(onPressed: () async {
           try {
-            if (!demo) await api.request('/leads/${lead['id']}/activities', method: 'POST', data: {'channel': channel, 'note': note.text.trim()});
+            if (!demo) await api.request('/leads/${lead['id']}',method:'PATCH',data:{
+              'name':lead['name'],'stage':lead['status']=='converted'?'Won':
+                lead['status'].toString()[0].toUpperCase()+lead['status'].toString().substring(1),
+              'notes':'${channel.toUpperCase()}: ${note.text.trim()}',
+            });
             setState(() => activities.insert(0, {'channel': channel, 'note': note.text.trim(), 'lead_name': lead['name'], 'date': DateTime.now().toLocal().toString().substring(0,16)}));
             if (ctx.mounted) Navigator.pop(ctx);
             notice('Activity recorded');
@@ -196,7 +224,7 @@ class _CrmAppState extends State<CrmApp> {
     ));
     if (ok != true) return;
     try {
-      if (!demo) await api.request('/leads/${lead['id']}', method: 'DELETE');
+      if (!demo) { notice('Delete records from the HRMS website.'); return; }
       setState(() => leads.removeWhere((e) => e['id'] == lead['id']));
       notice('Lead deleted');
     } catch (e) { notice('Delete failed: $e'); }
@@ -211,7 +239,7 @@ class _CrmAppState extends State<CrmApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'RCONSOFT CRM', debugShowCheckedModeBanner: false,
+    title: 'RCONSOFT HRMS CRM', debugShowCheckedModeBanner: false,
     theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: charcoal, colorScheme: const ColorScheme.dark(primary: crimson, surface: panel), useMaterial3: true, cardTheme: const CardThemeData(color: panel, margin: EdgeInsets.symmetric(vertical: 6))),
     home: signedIn ? home() : welcome(),
   );
@@ -221,11 +249,11 @@ class _CrmAppState extends State<CrmApp> {
       const CircleAvatar(radius: 44, backgroundColor: crimson, child: Icon(Icons.hub, size: 43, color: Colors.white)),
       const SizedBox(height: 26),
       const Text('RCONSOFT', textAlign: TextAlign.center, style: TextStyle(fontSize: 33, fontWeight: FontWeight.w900, letterSpacing: 3)),
-      const Text('CRM • LEADS • FOLLOW-UPS', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, letterSpacing: 2)),
+      const Text('HRMS • CRM • TEAM TASKS', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, letterSpacing: 2)),
       const SizedBox(height: 40),
       FilledButton.icon(onPressed: loginDialog, icon: const Icon(Icons.lock_open), label: const Padding(padding: EdgeInsets.all(12), child: Text('Employee Login'))),
       const SizedBox(height: 12),
-      OutlinedButton.icon(onPressed: () async { setState(() { signedIn = true; demo = true; username = 'Demo Employee'; }); await sync(); }, icon: const Icon(Icons.play_circle), label: const Padding(padding: EdgeInsets.all(12), child: Text('Explore Demo Mode'))),
+      const SizedBox.shrink(),
       const SizedBox(height: 22),
       const Text('Demo records stay on your device session only. Live CRM login needs an API endpoint on your existing cPanel Laravel website.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.white54)),
     ],
@@ -243,7 +271,7 @@ class _CrmAppState extends State<CrmApp> {
       NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
       NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Leads'),
       NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today), label: 'Tasks'),
-      NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'Activity'),
+      NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'Team'),
       NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
     ]),
   );
@@ -289,32 +317,45 @@ class _CrmAppState extends State<CrmApp> {
     return LeadsView(leads: leads, onEdit: saveLead, onActivity: activityDialog, onDelete: deleteLead, onCall: dial);
   }
 
-  Widget followupPage() {
-    final tasks = leads.where((e) => (e['next_follow_up_at']?.toString() ?? '').isNotEmpty).toList();
-    return ListView(padding: const EdgeInsets.all(18), children: [
-      section('Follow-up tasks'), const SizedBox(height: 5),
-      const Text('Lead follow-up dates from your CRM', style: TextStyle(color: Colors.white54)),
-      const SizedBox(height: 15),
-      if (tasks.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(35), child: Text('No follow-ups scheduled'))),
-      ...tasks.map((lead) => Card(child: ListTile(
-        leading: const CircleAvatar(backgroundColor: crimson, child: Icon(Icons.event, color: Colors.white)),
-        title: Text(lead['name']?.toString() ?? ''),
-        subtitle: Text('Due: ${lead['next_follow_up_at']}'),
-        trailing: IconButton(onPressed: () => activityDialog(lead), icon: const Icon(Icons.note_add)),
-        onTap: () => saveLead(lead),
-      ))),
-    ]);
-  }
+  Widget followupPage()=>ListView(padding:const EdgeInsets.all(18),children:[
+    section('Team tasks'),const SizedBox(height:12),
+    if(hrmsTasks.isEmpty) const Card(child:ListTile(title:Text('No tasks yet'))),
+    ...hrmsTasks.map((task)=>Card(child:ListTile(
+      leading:const Icon(Icons.task_alt,color:crimson),
+      title:Text((task['title']??'Task').toString()),
+      subtitle:Text('${task['assigned_to']??'Unassigned'} • ${task['status']??'Open'}'),
+      trailing:IconButton(icon:const Icon(Icons.done_all),tooltip:'Complete task',onPressed:()async{
+        try{
+          await api.request('/tasks/${task['id']}',method:'PATCH',data:{
+            'title':task['title'],'priority':task['priority']??'Medium','status':'Completed',
+            'description':task['description'],'assigned_to':task['assigned_to']});
+          await sync();notice('Task updated');
+        }catch(e){notice('Task error: $e');}
+      }),
+    ))),
+  ]);
 
-  Widget activityPage() => ListView(padding: const EdgeInsets.all(18), children: [
-    section('Activity history'), const SizedBox(height: 6),
-    const Text('Activities recorded during this session', style: TextStyle(color: Colors.white54)),
-    if (activities.isEmpty) const Padding(padding: EdgeInsets.all(35), child: Center(child: Text('No activities yet. Open a lead to add one.'))),
-    ...activities.map((a) => Card(child: ListTile(
-      leading: const CircleAvatar(backgroundColor: crimson, child: Icon(Icons.notes, color: Colors.white)),
-      title: Text('${a['lead_name']} • ${a['channel']}'),
-      subtitle: Text('${a['note']}\n${a['date']}'),
-    )))
+  Widget activityPage()=>ListView(padding:const EdgeInsets.all(18),children:[
+    section('Employees'),const SizedBox(height:12),
+    if(employees.isEmpty) const Card(child:ListTile(title:Text('No employees found'))),
+    ...employees.map((p)=>Card(child:ListTile(
+      leading:const Icon(Icons.badge,color:crimson),
+      title:Text('${p['first_name']??''} ${p['last_name']??''}'),
+      subtitle:Text('${p['employee_code']??''} • ${p['department']??''}'),
+    ))),
+    const SizedBox(height:18),
+    FilledButton.icon(onPressed:()async{
+      try{
+        final r=await api.request('/attendance');final list=r is Map?r['data']:r;
+        if(!mounted)return;
+        showModalBottomSheet(context:context,builder:(ctx)=>ListView(children:[
+          const ListTile(title:Text('Attendance history')),
+          ...(list is List?list:[]).take(20).map((v)=>ListTile(
+            title:Text((v['work_date']??'').toString()),
+            subtitle:Text('Employee: ${v['employee_id']} • ${v['status']}'))),
+        ]));
+      }catch(e){notice('Attendance error: $e');}
+    },icon:const Icon(Icons.schedule),label:const Text('Attendance history')),
   ]);
 
   Widget profilePage() => ListView(padding: const EdgeInsets.all(18), children: [
