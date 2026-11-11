@@ -1,0 +1,18 @@
+name: rconsoft_hrms_native
+publish_to: none
+description: RCONSOFT HRMS & CRM multi-tenant Android mobile client for Laravel 11.57.
+version: 4.0.0+4
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.3.0
+  flutter_secure_storage: ^9.2.4
+  path_provider: ^2.1.5
+  share_plus: ^11.1.0
+
+flutter:
+  uses-material-design: true

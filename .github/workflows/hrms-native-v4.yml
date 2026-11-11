@@ -1,0 +1,49 @@
+name: Build RCONSOFT Native HRMS V4 APK
+on:
+  push:
+    branches: [hrms-native-v4]
+    paths:
+      - 'flutter_hrms_native_v4/**'
+      - '.github/workflows/hrms-native-v4.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create Android runner and add internet access
+        working-directory: flutter_hrms_native_v4
+        run: |
+          flutter create --platforms=android --org com.rconsoft --project-name rconsoft_hrms_native .
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
+          if 'android.permission.INTERNET' not in s:
+            s=s.replace('<application','<uses-permission android:name="android.permission.INTERNET" />\n    <application',1)
+          s=s.replace('android:label="rconsoft_hrms_native"','android:label="RCONSOFT HRMS Native"')
+          p.write_text(s)
+          PY
+          flutter pub get
+          dart format lib
+          dart analyze lib --no-fatal-warnings
+      - name: Build release APK
+        working-directory: flutter_hrms_native_v4
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCONSOFT_HRMS_NATIVE_V4_APK
+          path: flutter_hrms_native_v4/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
