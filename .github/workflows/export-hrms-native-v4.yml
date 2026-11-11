@@ -1,0 +1,23 @@
+name: Export RCONSOFT Native Flutter V4 Source and API Patch
+on:
+  push:
+    branches: [hrms-native-v4]
+    paths:
+      - '.github/workflows/export-hrms-native-v4.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package Flutter source and Laravel API patch
+        run: |
+          zip -qr RCONSOFT_HRMS_NATIVE_V4_SOURCE_API.zip flutter_hrms_native_v4 backend_patch_v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCONSOFT_HRMS_NATIVE_V4_SOURCE_API
+          path: RCONSOFT_HRMS_NATIVE_V4_SOURCE_API.zip
+          if-no-files-found: error
+          retention-days: 30
