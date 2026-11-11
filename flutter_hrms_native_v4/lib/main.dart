@@ -655,7 +655,6 @@ class _LeadsPageState extends State<_LeadsPage> {
     final source=TextEditingController(text:_str(item?['source'],''));
     final followup=TextEditingController(text:_str(item?['next_follow_up'],'').split('T').first);
     final assigned=TextEditingController(text:_str(item?['assigned_to'],''));
-    final due=TextEditingController(text:_str(item?['due_date'],'').split('T').first);
     String stage = _str(item?['stage'], 'New');
     const stages = ['New','Contacted','Qualified','Proposal','Negotiation','Won','Lost'];
     if (!stages.contains(stage)) stage = 'New';
@@ -744,6 +743,7 @@ class _TasksPageState extends State<_TasksPage> {
     final title=TextEditingController(text:_str(item?['title'],''));
     final description=TextEditingController(text:_str(item?['description'],''));
     final assigned=TextEditingController(text:_str(item?['assigned_to'],''));
+    final due=TextEditingController(text:_str(item?['due_date'],'').split('T').first);
     String status=_str(item?['status'],'Open'),priority=_str(item?['priority'],'Medium');
     const statuses=['Open','In Progress','Blocked','Completed'];
     const priorities=['Low','Medium','High','Urgent'];
