@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+part 'native_modules.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -13,8 +15,6 @@ const _card = Color(0xFF191F2C);
 const _red = Color(0xFFE9474B);
 const _muted = Color(0xFFA5B0C2);
 const _green = Color(0xFF4BD5A2);
-
-part 'native_modules.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
