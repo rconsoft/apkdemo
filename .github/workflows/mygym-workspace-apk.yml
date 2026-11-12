@@ -1,0 +1,57 @@
+name: Build MyGym Workspace Native Flutter APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mygym_workspace/**'
+      - '.github/workflows/mygym-workspace-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Extract MyGym Workspace Flutter source
+        run: |
+          test -f mygym_workspace/flutter_source.tar.xz || (echo 'Upload flutter_source.tar.xz to mygym_workspace/ first' && exit 1)
+          tar -xJf mygym_workspace/flutter_source.tar.xz -C mygym_workspace/
+      - name: Generate native Android project
+        working-directory: mygym_workspace/flutter_app
+        run: |
+          flutter create --platforms=android --org com.rconsoft --project-name mygym_workspace .
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          if 'android.permission.INTERNET' not in s:
+              s = s.replace('<application','<uses-permission android:name="android.permission.INTERNET" />\n    <application',1)
+          s = s.replace('android:label="mygym_workspace"', 'android:label="MyGym Workspace"')
+          p.write_text(s)
+          PY
+          flutter pub get
+      - name: Analyze Flutter
+        working-directory: mygym_workspace/flutter_app
+        run: flutter analyze
+      - name: Compile release APK
+        working-directory: mygym_workspace/flutter_app
+        run: flutter build apk --release
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyGym_Workspace_APK
+          path: mygym_workspace/flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+          if-no-files-found: error
