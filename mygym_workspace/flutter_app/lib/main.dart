@@ -163,7 +163,7 @@ class OwnerScreen extends StatelessWidget {final GymApi api;const OwnerScreen({s
      const SizedBox(height:7),Text('Admins: ${g['admins_count']}    Managers: ${g['managers_count']}'),
      if(g['installed']!=true)const Text('Tenant DB installation pending',style:TextStyle(color:red)),
    ]))
- ]);});}
+ ]);});
 }
 
 class DashboardScreen extends StatelessWidget {final GymApi api;const DashboardScreen({super.key,required this.api});
@@ -182,7 +182,7 @@ class DashboardScreen extends StatelessWidget {final GymApi api;const DashboardS
      for(final m in recent)tileCard(child:ListTile(contentPadding:EdgeInsets.zero,leading:const CircleAvatar(backgroundColor:panel2,child:Icon(Icons.person,color:cyan)),
        title:Text('${m['name']}'),subtitle:Text('${m['member_id']} • ${m['plan']}'),trailing:Text('${m['status']}',style:const TextStyle(color:muted)))),
      if(recent.isEmpty)const Text('No members yet.',style:TextStyle(color:muted))
-   ]);});}
+   ]);});
  Widget _metric(String label,String value,IconData icon,Color color)=>SizedBox(width:170,child:Container(
    padding:const EdgeInsets.all(15),decoration:BoxDecoration(color:panel,borderRadius:BorderRadius.circular(17)),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon,color:color,size:29),const SizedBox(height:15),
@@ -215,7 +215,7 @@ class _MembersScreenState extends State<MembersScreen>{
         IconButton(onPressed:page>1?()=>setState(()=>page--):null,icon:const Icon(Icons.chevron_left)),
         Text('Page $page / ${data['last_page']??1}'),
         IconButton(onPressed:page<(data['last_page']??1)?()=>setState(()=>page++):null,icon:const Icon(Icons.chevron_right))])
-   ]);});}
+   ]);});
 }
 
 class MemberDetail extends StatelessWidget {final GymApi api;final String id;
@@ -232,7 +232,7 @@ class MemberDetail extends StatelessWidget {final GymApi api;final String id;
      const SizedBox(height:19),const SectionTitle('Payment History'),const SizedBox(height:10),
      for(final p in payments)tileCard(child:ListTile(title:Text(money(p['amount'])),
        subtitle:Text('${p['pay_date']} • ${p['mode']}'),leading:const Icon(Icons.receipt_long,color:cyan)))
-   ]);})));
+   ]);}));
 }
 
 class PaymentsScreen extends StatefulWidget{final GymApi api;const PaymentsScreen({super.key,required this.api});

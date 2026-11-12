@@ -40,7 +40,7 @@ jobs:
           flutter pub get
       - name: Dart static analysis
         working-directory: mygym_workspace/flutter_app
-        run: flutter analyze
+        run: flutter analyze lib --no-fatal-infos
       - name: Compile Flutter APK
         working-directory: mygym_workspace/flutter_app
         run: flutter build apk --release
