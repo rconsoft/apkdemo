@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'api.dart';
 
-const bg = Color(0xFF080C17);
-const panel = Color(0xFF111A2B);
-const panel2 = Color(0xFF19263A);
-const red = Color(0xFFFF3C57);
-const cyan = Color(0xFF52D9E7);
-const muted = Color(0xFF9CAFC4);
+const bg = Color(0xFF080809);
+const panel = Color(0xFF171014);
+const panel2 = Color(0xFF28161D);
+const red = Color(0xFFF23550);
+const redSoft = Color(0xFFFF8999);
+const muted = Color(0xFFBDA8B0);
 
 void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const MyGymApp()); }
 
@@ -20,7 +20,7 @@ class MyGymApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'MyGym Workspace', debugShowCheckedModeBanner: false,
     theme: ThemeData(brightness: Brightness.dark, useMaterial3: true,
-      scaffoldBackgroundColor: bg, colorScheme: const ColorScheme.dark(primary: red, secondary: cyan, surface: panel),
+      scaffoldBackgroundColor: bg, colorScheme: const ColorScheme.dark(primary: red, secondary: redSoft, surface: panel),
       appBarTheme: const AppBarTheme(backgroundColor: bg, foregroundColor: Colors.white),
       inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: panel2,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(13), borderSide: BorderSide.none),
@@ -147,7 +147,7 @@ class OwnerScreen extends StatelessWidget {final GymApi api;const OwnerScreen({s
  @override Widget build(BuildContext context)=>AsyncScreen(load:()=>api.get('/gyms'),builder:(data){
    final gyms=maps(data['gyms']);return ListView(padding:const EdgeInsets.all(16),children:[
    SectionTitle('Gym Control Center',caption:'RconSoft • Multi-database tenant registry'),const SizedBox(height:17),
-   tileCard(child:Row(children:[const Icon(Icons.apartment,color:cyan,size:34),const SizedBox(width:17),
+   tileCard(child:Row(children:[const Icon(Icons.apartment,color:redSoft,size:34),const SizedBox(width:17),
       Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${gyms.length}',style:const TextStyle(fontSize:29,fontWeight:FontWeight.bold)),const Text('Registered gyms',style:TextStyle(color:muted))])])),
    for(final g in gyms)tileCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
      Row(children:[const Icon(Icons.fitness_center,color:red),const SizedBox(width:12),Expanded(child:Text('${g['name']}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.bold))),
@@ -165,14 +165,14 @@ class DashboardScreen extends StatelessWidget {final GymApi api;const DashboardS
    return ListView(padding:const EdgeInsets.all(16),children:[
      SectionTitle('Overview',caption:'${api.gym?['name']??'Gym'} • Live workspace metrics'),const SizedBox(height:16),
      Wrap(spacing:10,runSpacing:10,children:[
-       _metric('Total Members','${data['total_members']??0}',Icons.groups_outlined,cyan),
+       _metric('Total Members','${data['total_members']??0}',Icons.groups_outlined,redSoft),
        _metric('Active Members','${data['active_members']??0}',Icons.check_circle_outline,Colors.greenAccent),
        _metric('Inactive','${data['inactive_members']??0}',Icons.person_off_outlined,Colors.orangeAccent),
        _metric('Check-ins Today','${data['today_checkins']??0}',Icons.how_to_reg,red),
-       if(api.admin)_metric('Today Revenue',money(data['today_revenue']),Icons.currency_rupee,cyan),
+       if(api.admin)_metric('Today Revenue',money(data['today_revenue']),Icons.currency_rupee,redSoft),
        if(api.admin)_metric('Monthly Revenue',money(data['month_revenue']),Icons.trending_up,Colors.greenAccent),
      ]),const SizedBox(height:20),const SectionTitle('Recent Members'),const SizedBox(height:10),
-     for(final m in recent)tileCard(child:ListTile(contentPadding:EdgeInsets.zero,leading:const CircleAvatar(backgroundColor:panel2,child:Icon(Icons.person,color:cyan)),
+     for(final m in recent)tileCard(child:ListTile(contentPadding:EdgeInsets.zero,leading:const CircleAvatar(backgroundColor:panel2,child:Icon(Icons.person,color:redSoft)),
        title:Text('${m['name']}'),subtitle:Text('${m['member_id']} • ${m['plan']}'),trailing:Text('${m['status']}',style:const TextStyle(color:muted)))),
      if(recent.isEmpty)const Text('No members yet.',style:TextStyle(color:muted))
    ]);});
@@ -200,7 +200,7 @@ class _MembersScreenState extends State<MembersScreen>{
       Text('Found: ${data['total']??0}',style:const TextStyle(color:muted)),const SizedBox(height:9),
       for(final m in members)tileCard(child:ListTile(contentPadding:EdgeInsets.zero,
          onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>MemberDetail(api:widget.api,id:'${m['member_id']}'))),
-         leading:const CircleAvatar(backgroundColor:panel2,child:Icon(Icons.person_outline,color:cyan)),
+         leading:const CircleAvatar(backgroundColor:panel2,child:Icon(Icons.person_outline,color:redSoft)),
          title:Text('${m['name']}'),subtitle:Text('${m['member_id']}  •  ${m['phone']??''}\n${m['plan']}  •  ${m['status']}'),
          isThreeLine:true,trailing:const Icon(Icons.chevron_right))),
       if(members.isEmpty)const Padding(padding:EdgeInsets.all(30),child:Text('No matching members.',textAlign:TextAlign.center)),
@@ -224,7 +224,7 @@ class MemberDetail extends StatelessWidget {final GymApi api;final String id;
        icon:const Icon(Icons.add_card),label:const Text('Record Payment')),
      const SizedBox(height:19),const SectionTitle('Payment History'),const SizedBox(height:10),
      for(final p in payments)tileCard(child:ListTile(title:Text(money(p['amount'])),
-       subtitle:Text('${p['pay_date']} • ${p['mode']}'),leading:const Icon(Icons.receipt_long,color:cyan)))
+       subtitle:Text('${p['pay_date']} • ${p['mode']}'),leading:const Icon(Icons.receipt_long,color:redSoft)))
    ]);}));
 }
 
@@ -318,7 +318,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>{
   const SizedBox(height:15),FilledButton.icon(onPressed:busy?null:()=>mark('Present'),icon:const Icon(Icons.login),label:const Text('Check In / Present')),
   const SizedBox(height:9),OutlinedButton.icon(onPressed:busy?null:()=>mark('checkout'),icon:const Icon(Icons.logout),label:const Text('Check Out')) ,
   const SizedBox(height:9),OutlinedButton(onPressed:busy?null:()=>mark('Absent'),child:const Text('Mark Absent')),
-  if(result!=null)Padding(padding:const EdgeInsets.all(14),child:Text(result!,style:const TextStyle(color:cyan))),
+  if(result!=null)Padding(padding:const EdgeInsets.all(14),child:Text(result!,style:const TextStyle(color:redSoft))),
   const SizedBox(height:20),AsyncScreen(load:()=>widget.api.get('/attendance'),builder:(d)=>Column(
     crossAxisAlignment:CrossAxisAlignment.start,children:[const SectionTitle('Today’s Log'),const SizedBox(height:10),
     for(final a in maps(d['data']))tileCard(child:ListTile(title:Text('${a['member_id']}'),
@@ -359,7 +359,7 @@ class _UpiScreenState extends State<UpiScreen>{
 class AccountScreen extends StatelessWidget {final GymApi api;final Future<void> Function() onLogout;
  const AccountScreen({super.key,required this.api,required this.onLogout});
  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[
-   const SectionTitle('Account'),const SizedBox(height:17),tileCard(child:ListTile(leading:const Icon(Icons.verified_user,color:cyan),
+   const SectionTitle('Account'),const SizedBox(height:17),tileCard(child:ListTile(leading:const Icon(Icons.verified_user,color:redSoft),
       title:Text('${api.identity?['username']}'),subtitle:Text('${api.identity?['role']}'))),
    FilledButton.icon(onPressed:onLogout,icon:const Icon(Icons.logout),label:const Text('Sign out'))
  ]);
