@@ -32,10 +32,8 @@ class GymApi {
     }
   }
 
-  Future<void> login({required String type, required String code,
-    required String username, required String password}) async {
+  Future<void> login({required String username, required String password}) async {
     final r = await post('/login', {
-      'account_type': type, 'gym_code': code.trim().toUpperCase(),
       'username': username.trim(), 'password': password, 'device_name': 'MyGym Workspace Android'
     }, authenticated: false);
     token = r['token']?.toString();
