@@ -45,12 +45,12 @@ class SignIn extends StatefulWidget { final GymApi api; final VoidCallback onLog
   const SignIn({super.key, required this.api, required this.onLogin});
   @override State<SignIn> createState()=>_SignInState(); }
 class _SignInState extends State<SignIn>{
-  final user=TextEditingController(), password=TextEditingController(), code=TextEditingController();
-  bool owner=false, loading=false, visible=false;String? error;
-  @override void dispose(){user.dispose();password.dispose();code.dispose();super.dispose();}
+  final user=TextEditingController(), password=TextEditingController();
+  bool loading=false, visible=false;String? error;
+  @override void dispose(){user.dispose();password.dispose();super.dispose();}
   Future<void> submit() async{
     setState(() {loading=true;error=null;});
-    try{await widget.api.login(type:owner?'owner':'gym',code:code.text,username:user.text,password:password.text);
+    try{await widget.api.login(username:user.text,password:password.text);
       widget.onLogin();
     }catch(e){if(mounted)setState(()=>error=e.toString());}
     finally{if(mounted)setState(()=>loading=false);}
@@ -62,12 +62,9 @@ class _SignInState extends State<SignIn>{
           const CircleAvatar(radius:37,backgroundColor:panel2,child:Icon(Icons.fitness_center,color:red,size:38))),
         const Text('MyGym Workspace',textAlign:TextAlign.center,style:TextStyle(fontSize:29,fontWeight:FontWeight.w900)),
         const SizedBox(height:7),const Text('Powered by RconSoft • Secure Gym Cloud',textAlign:TextAlign.center,style:TextStyle(color:muted)),
-        const SizedBox(height:30),Container(padding:const EdgeInsets.all(5),decoration:BoxDecoration(color:panel,borderRadius:BorderRadius.circular(13)),
-        child:Row(children:[Expanded(child:_mode('Gym Workspace',!owner,()=>setState(()=>owner=false))),
-          Expanded(child:_mode('RconSoft Owner',owner,()=>setState(()=>owner=true)))])),
-        const SizedBox(height:22),if(!owner)...[
-          const FieldLabel('GYM CODE'),TextField(controller:code,textCapitalization:TextCapitalization.characters,
-            decoration:const InputDecoration(hintText:'BESTRONG / GKFITNESS',prefixIcon:Icon(Icons.business))),const SizedBox(height:15)],
+        const SizedBox(height:22),const Text('Sign in with your username and password. Your gym and role are selected automatically.',
+          textAlign:TextAlign.center,style:TextStyle(color:muted,fontSize:13)),
+        const SizedBox(height:22),
         const FieldLabel('USERNAME'),TextField(controller:user,decoration:const InputDecoration(hintText:'Enter username',prefixIcon:Icon(Icons.person_outline))),
         const SizedBox(height:15),const FieldLabel('PASSWORD'),TextField(controller:password,obscureText:!visible,
           decoration:InputDecoration(hintText:'Password',prefixIcon:const Icon(Icons.lock_outline),
@@ -79,10 +76,6 @@ class _SignInState extends State<SignIn>{
         const SizedBox(height:20),const Text('Each gym has its own private database. QR and payments belong only to that gym.',
           textAlign:TextAlign.center,style:TextStyle(color:muted,fontSize:12))
       ]))))));
-  Widget _mode(String text,bool active,VoidCallback tap)=>InkWell(onTap:tap,borderRadius:BorderRadius.circular(10),
-    child:Container(padding:const EdgeInsets.symmetric(vertical:13),decoration:BoxDecoration(
-      color:active?red:Colors.transparent,borderRadius:BorderRadius.circular(10)),
-      child:Text(text,textAlign:TextAlign.center,style:TextStyle(fontWeight:FontWeight.bold,color:active?Colors.white:muted))));
 }
 
 class Workspace extends StatefulWidget {
