@@ -33,7 +33,7 @@ jobs:
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           if 'android.permission.INTERNET' not in s:
-              s = s.replace('<application', '<uses-permission android:name="INTERNET" />\n    <application', 1)
+              s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
           s = s.replace('android:label="mygym_workspace"', 'android:label="MyGym Workspace"')
           p.write_text(s)
           PY
